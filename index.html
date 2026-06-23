@@ -2,15 +2,17 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>PixelScan AI</title>
   
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
   <link rel="manifest" href="data:application/json;charset=utf-8,%7B%22name%22%3A%22PixelScan%20AI%22%2C%22short_name%22%3A%22PixelScan%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23f3f4f9%22%2C%22theme_color%22%3A%22%231a73e8%22%2C%22orientation%22%3A%22portrait%22%7D">
   <meta name="theme-color" content="#f3f4f9">
   <meta name="apple-mobile-web-app-capable" content="yes">
 
   <style>
-    /* Estilos Material You / Pixel Design */
     :root {
       --md-sys-color-primary: #005faf;
       --md-sys-color-on-primary: #ffffff;
@@ -21,45 +23,41 @@
       --md-sys-color-surface-variant: #e1e2ec;
       --md-sys-color-on-surface-variant: #44474f;
       --md-radius-large: 28px;
-      --md-radius-medium: 16px;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
     body {
-      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      font-family: system-ui, -apple-system, sans-serif;
       background-color: var(--md-sys-color-surface);
       color: var(--md-sys-color-on-surface);
       display: flex;
       flex-direction: column;
       height: 100vh;
-      height: -webkit-fill-available;
       overflow: hidden;
+      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
     }
 
-    /* Contenedor principal de la cámara / vista previa */
     .app-container {
       flex: 1;
       position: relative;
-      margin: 16px;
-      background-color: #000000;
+      margin: 12px;
+      background-color: #000;
       border-radius: var(--md-radius-large);
       overflow: hidden;
       display: flex;
       justify-content: center;
       align-items: center;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
     }
 
     video, canvas {
       width: 100%;
       height: 100%;
-      object-fit: cover; /* Modo inmersivo total en pantalla */
+      object-fit: cover;
     }
 
     canvas { display: none; background-color: #fff; }
 
-    /* Píldora de estado estilo notificación de Android */
     .status-toast {
       position: absolute;
       top: 16px;
@@ -67,74 +65,63 @@
       transform: translateX(-50%);
       background-color: rgba(26, 28, 30, 0.9);
       color: #fff;
-      padding: 10px 20px;
+      padding: 12px 24px;
       border-radius: 50px;
       font-size: 0.9rem;
       font-weight: 500;
-      backdrop-filter: blur(8px);
+      backdrop-filter: blur(10px);
       z-index: 10;
       display: none;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
       text-align: center;
-      white-space: nowrap;
+      max-width: 85%;
     }
 
-    /* Panel de control inferior responsivo */
     .action-bar {
-      padding: 24px 16px 34px 16px; /* Espacio extra abajo para gestos de navegación de Android */
+      padding: 16px 16px 24px 16px;
       background-color: var(--md-sys-color-surface);
       display: flex;
       justify-content: center;
       align-items: center;
-      gap: 16px;
+      gap: 12px;
+      width: 100%;
     }
 
-    /* Botones estilo Material You */
     .btn {
       border: none;
-      outline: none;
       font-family: inherit;
       font-size: 1rem;
       font-weight: 600;
-      padding: 18px 32px;
+      padding: 16px 24px;
       border-radius: var(--md-radius-large);
       cursor: pointer;
-      transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+      transition: all 0.2s ease;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      min-height: 56px;
     }
 
-    /* Botón principal de captura */
     .btn-primary {
       background-color: var(--md-sys-color-primary-container);
       color: var(--md-sys-color-on-primary-container);
-      flex: 1;
-      max-width: 280px;
+      flex: 2;
     }
 
-    .btn-primary:active {
-      transform: scale(0.95);
-      background-color: #c0d6ff;
-    }
+    .btn-primary:active { transform: scale(0.97); background-color: #c0d6ff; }
 
-    /* Botón de acción secundaria (Resetear / Cancelar) */
     .btn-secondary {
       background-color: var(--md-sys-color-surface-variant);
       color: var(--md-sys-color-on-surface-variant);
-      padding: 18px 24px;
+      flex: 1;
     }
 
-    /* Botón de confirmación (Éxito / Guardar) */
     .btn-success {
       background-color: #006e36;
       color: white;
-      flex: 1;
-      max-width: 220px;
+      flex: 2;
     }
 
-    /* Utilidades de visualización */
     .hidden { display: none !important; }
   </style>
 </head>
@@ -148,8 +135,7 @@
 
   <div class="action-bar">
     <button id="btn-capture" class="btn btn-primary">Capturar Documento</button>
-    
-    <button id="btn-reset" class="btn btn-secondary hidden">Nueva foto</button>
+    <button id="btn-reset" class="btn btn-secondary hidden">Reintentar</button>
     <button id="btn-process" class="btn btn-success hidden">Procesar PDF</button>
   </div>
 
@@ -165,10 +151,13 @@
 
     let stream = null;
 
-    // 1. Acceso a hardware maximizando resolución del sensor Pixel
     async function startCamera() {
-      showStatus("Accediendo al sensor Ultra HD...");
+      showStatus("Accediendo al sensor HD...");
       try {
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop());
+        }
+
         const constraints = {
           video: {
             facingMode: { ideal: "environment" },
@@ -180,21 +169,18 @@
         video.srcObject = stream;
         hideStatus();
       } catch (err) {
-        console.error(err);
-        showStatus("Error de hardware. Permite el acceso a la cámara.");
+        console.error("Error de cámara:", err);
+        showStatus("Error de acceso a cámara.");
       }
     }
 
-    // 2. Captura estática en resolución real
     btnCapture.addEventListener('click', () => {
-      if (!stream) return;
+      if (!stream || video.videoWidth === 0) return;
 
-      // Fijar tamaño real del sensor al lienzo antes de renderizar
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      // Alternar visibilidad con animaciones fluidas
       video.classList.add('hidden');
       canvas.style.display = 'block';
       
@@ -203,7 +189,6 @@
       btnProcess.classList.remove('hidden');
     });
 
-    // 3. Reestablecer el flujo de la cámara
     btnReset.addEventListener('click', () => {
       video.classList.remove('hidden');
       canvas.style.display = 'none';
@@ -214,69 +199,69 @@
       hideStatus();
     });
 
-    // 4. Inyección asíncrona de librerías en caliente (Lazy-Loading) y OCR
     btnProcess.addEventListener('click', async () => {
-      showStatus("Cargando inteligencia local...");
+      showStatus("Optimizando contraste...");
       
-      try {
-        // Carga dinámica de dependencias globales solo si no se han descargado previamente
-        if (!window.Tesseract) {
-          await injectScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js');
-        }
-        if (!window.jspdf) {
-          await injectScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
-        }
+      // Espera pequeña para que la UI pinte el estado antes de la carga pesada
+      await new Promise(r => setTimeout(r, 100));
 
-        showStatus("Limpiando sombras e incrementando contraste...");
+      try {
         binarizarImagen();
 
-        showStatus("Analizando estructura del documento (OCR)...");
-        const worker = await Tesseract.createWorker('spa');
+        showStatus("Procesando OCR (Cargando datos)...");
+
+        // CONFIGURACIÓN ULTRA-ROBUSTA:
+        // Inicializamos el worker con rutas explícitas de la misma CDN para que no se congele por bloqueos de red locales
+        const worker = await Tesseract.createWorker('spa', 1, {
+          workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js',
+          corePath: 'https://cdn.jsdelivr.net/npm/tesseract-core@5.1.1/tesseract-core.wasm.js',
+          logger: m => {
+            if(m.status === 'recognizing') {
+              showStatus(`Analizando texto: ${Math.floor(m.progress * 100)}%`);
+            }
+          }
+        });
+
         const { data } = await worker.recognize(canvas);
         await worker.terminate();
 
-        showStatus("Incrustando capa interactiva en el PDF...");
+        showStatus("Creando PDF indexable...");
         generarPDFHibrido(data);
 
-        showStatus("¡Documento guardado con éxito!");
-        setTimeout(hideStatus, 3000);
+        showStatus("¡PDF Guardado!");
+        setTimeout(hideStatus, 2500);
 
       } catch (error) {
-        console.error(error);
-        showStatus("Error durante el procesamiento.");
+        console.error("Error crítico en el proceso:", error);
+        showStatus("Error de procesamiento. Intenta de nuevo.");
       }
     });
 
-    // Algoritmo local de binarización rápida para aislar texto de fondos arrugados u opacos
     function binarizarImagen() {
       const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imgData.data;
       for (let i = 0; i < data.length; i += 4) {
-        // Coeficientes de luminancia estándar NTSC
         const luminosidad = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
-        const blancoBlack = (luminosidad > 130) ? 255 : 0;
+        // Umbral adaptativo intermedio
+        const blancoBlack = (luminosidad > 128) ? 255 : 0;
         data[i] = data[i+1] = data[i+2] = blancoBlack;
       }
       ctx.putImageData(imgData, 0, 0);
     }
 
-    // Compilación del PDF híbrido (Imagen real de fondo + texto indexable transparente arriba)
     function generarPDFHibrido(ocrData) {
       const { jsPDF } = window.jspdf;
       const orientacion = canvas.width > canvas.height ? 'l' : 'p';
       const pdf = new jsPDF(orientacion, 'px', [canvas.width, canvas.height]);
 
-      // Guardar instantánea del lienzo binarizado u original como base visual
       const base64Img = canvas.toDataURL('image/jpeg', 0.85);
       pdf.addImage(base64Img, 'JPEG', 0, 0, canvas.width, canvas.height);
 
-      // Activar capa seleccionable de texto
       pdf.setTextColor(0, 0, 0);
       pdf.setDisplayMode({ renderText: true });
 
       ocrData.words.forEach(palabra => {
-        pdf.setFontSize(palabra.font_size || 11);
-        // El modo de renderizado invisible permite seleccionar/copiar tablas sin alterar la foto original
+        pdf.setFontSize(palabra.font_size || 10);
         pdf.text(palabra.text, palabra.bbox.x0, palabra.bbox.y1, {
           renderingMode: 'invisible',
           maxWidth: palabra.bbox.x1 - palabra.bbox.x0
@@ -286,33 +271,10 @@
       pdf.save(`PixelScan_${Date.now()}.pdf`);
     }
 
-    // Helper imperativo para inyectar scripts externos
-    function injectScript(url) {
-      return new Promise((resolve, reject) => {
-        const s = document.createElement('script');
-        s.src = url;
-        s.onload = resolve;
-        s.onerror = reject;
-        document.head.appendChild(s);
-      });
-    }
-
     function showStatus(msg) { statusDiv.innerText = msg; statusDiv.style.display = 'block'; }
     function hideStatus() { statusDiv.style.display = 'none'; }
 
-    // Inicializar hardware al cargar la ventana
     window.addEventListener('DOMContentLoaded', startCamera);
-
-    // Auto-registro en caliente del Service Worker embebido en una cadena para soporte Offline total
-    if ('serviceWorker' in navigator) {
-      const swCode = `
-        const CACHE = 'pixel-v2';
-        self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.add('./'))));
-        self.addEventListener('fetch', e => e.respondWith(caches.match(e.request).then(r => r || fetch(e.request))));
-      `;
-      const blob = new Blob([swCode], { type: 'application/javascript' });
-      navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(() => {});
-    }
   </script>
 </body>
 </html>
